@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0f0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Control de horas trabajadas con descuento automático de comida y almuerzo">
+  <title>Horometro — Control de Horas</title>
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2310b981'/><text x='50' y='68' text-anchor='middle' font-size='45' font-weight='bold' fill='white'>H</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2310b981'/><text x='50' y='68' text-anchor='middle' font-size='45' font-weight='bold' fill='white'>H</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #060b09;
+      --bg-elevated: #0d1512;
+      --bg-card: #111c18;
+      --bg-card-hover: #162420;
+      --fg: #e8f0ec;
+      --fg-muted: #7a9489;
+      --fg-dim: #4a6559;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --accent-soft: rgba(16, 185, 129, 0.1);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.2);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.2);
+      --border: rgba(16, 185, 129, 0.12);
+      --border-strong: rgba(16, 185, 129, 0.25);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
+      --font-ui: 'Space Grotesk', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--fg);
+      scroll-behavior: smooth;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      min-height: 100dvh;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: -40%; left: -20%;
+      width: 80vw; height: 80vw;
+      background: radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+      animation: floatBlob 20s ease-in-out infinite;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -30%; right: -20%;
+      width: 70vw; height: 70vw;
+      background: radial-gradient(circle, rgba(245,158,11,0.04) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+      animation: floatBlob 25s ease-in-out infinite reverse;
+    }
+    @keyframes floatBlob {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(5%, -8%) scale(1.05); }
+      66% { transform: translate(-3%, 5%) scale(0.95); }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--fg-dim); border-radius: 3px; }
+
+    .app-header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(6, 11, 9, 0.85);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+    }
+    .header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 800px; margin: 0 auto;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 36px; height: 36px; background: var(--accent);
+      border-radius: var(--radius-xs);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-weight: 700; font-size: 18px; color: var(--bg);
+    }
+    .logo-text { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo-text span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .month-badge {
+      font-size: 11px; font-weight: 600; padding: 5px 10px;
+      border-radius: 20px; background: var(--accent-soft);
+      color: var(--accent); border: 1px solid var(--border-strong);
+      font-family: var(--font-mono);
+    }
+    .sync-badge {
+      font-size: 10px; font-weight: 600; padding: 4px 8px;
+      border-radius: 12px; border: 1px solid;
+      display: flex; align-items: center; gap: 4px;
+      transition: all 0.3s;
+    }
+    .sync-badge.online { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: var(--accent); }
+    .sync-badge.offline { background: var(--danger-glow); border-color: rgba(239,68,68,0.3); color: var(--danger); }
+    .sync-badge.syncing { background: var(--warning-glow); border-color: rgba(245,158,11,0.3); color: var(--warning); }
+    .sync-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+    }
+    .sync-badge.online .sync-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+    .btn-icon {
+      width: 36px; height: 36px; border: 1px solid var(--border);
+      border-radius: var(--radius-xs); background: var(--bg-card);
+      color: var(--fg-muted); display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+    }
+    .btn-icon:hover { border-color: var(--border-strong); color: var(--fg); background: var(--bg-card-hover); }
+    .nav-tabs {
+      display: flex; gap: 4px; max-width: 800px; margin: 12px auto 0;
+      background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 4px;
+    }
+    .nav-tab {
+      flex: 1; padding: 8px 12px; border: none; border-radius: var(--radius-xs);
+      background: transparent; color: var(--fg-muted); font-family: var(--font-ui);
+      font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.25s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .nav-tab.active { background: var(--accent); color: var(--bg); font-weight: 600; box-shadow: 0 2px 12px var(--accent-glow); }
+    .nav-tab:not(.active):hover { color: var(--fg); background: var(--bg-card); }
+
+    main { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .view { display: none; animation: fadeIn 0.3s ease; }
+    .view.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px; transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--border-strong); }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted); margin-bottom: 16px; }
+
+    .clock-section { text-align: center; padding: 24px 20px; }
+    .live-clock {
+      font-family: var(--font-mono); font-size: clamp(44px, 10vw, 72px);
+      font-weight: 700; letter-spacing: -2px; line-height: 1; margin-bottom: 6px;
+      background: linear-gradient(135deg, var(--fg) 60%, var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .live-date { font-size: 15px; color: var(--fg-muted); }
+
+    .form-card {
+      background: var(--bg-card); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.05);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .form-field { display: flex; flex-direction: column; gap: 6px; }
+    .form-field label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--fg-dim); }
+    .form-field input {
+      width: 100%; padding: 12px 14px; border: 1px solid var(--border);
+      border-radius: var(--radius-xs); background: var(--bg-elevated);
+      color: var(--fg); font-family: var(--font-mono); font-size: 16px;
+      font-weight: 600; outline: none; transition: all 0.2s;
+    }
+    .form-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    .descuento-info {
+      display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+      background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15);
+      border-radius: var(--radius-xs); margin-bottom: 16px;
+      font-size: 13px; color: var(--warning); font-weight: 500;
+    }
+    .preview-calc {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;
+      padding: 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);
+    }
+    .preview-item { text-align: center; }
+    .preview-value { font-family: var(--font-mono); font-size: 22px; font-weight: 700; line-height: 1.2; }
+    .preview-value.green { color: var(--accent); }
+    .preview-value.amber { color: var(--warning); }
+    .preview-value.white { color: var(--fg); }
+    .preview-label { font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+    .btn {
+      padding: 12px 24px; border: 1px solid var(--border); border-radius: var(--radius-xs);
+      background: var(--bg-card); color: var(--fg); font-family: var(--font-ui);
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:hover { border-color: var(--border-strong); background: var(--bg-card-hover); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .btn-primary:hover { background: #0fd48f; border-color: #0fd48f; box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-danger { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: var(--danger-glow); border-color: var(--danger); }
+    .btn-block { width: 100%; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .stat-card {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 16px; transition: all 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .stat-value { font-family: var(--font-mono); font-size: 26px; font-weight: 700; line-height: 1.1; margin-bottom: 4px; }
+    .stat-value.green { color: var(--accent); }
+    .stat-value.amber { color: var(--warning); }
+    .stat-value.red { color: var(--danger); }
+    .stat-value.white { color: var(--fg); }
+    .stat-label { font-size: 11px; color: var(--fg-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .chart-container { width: 100%; height: 200px; display: flex; align-items: flex-end; gap: 6px; padding: 10px 0 0; }
+    .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+    .chart-bar {
+      width: 100%; max-width: 40px; border-radius: 4px 4px 0 0;
+      background: var(--accent); min-height: 4px;
+      transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .chart-bar.extra { background: linear-gradient(to top, var(--accent), var(--warning)); }
+    .chart-bar.empty { background: var(--fg-dim); opacity: 0.15; }
+    .chart-bar-label { font-size: 11px; color: var(--fg-dim); font-family: var(--font-mono); font-weight: 500; }
+    .chart-bar-value { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); font-weight: 600; }
+
+    .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .history-filters { display: flex; gap: 6px; }
+    .filter-btn {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; color: var(--fg-muted); font-family: var(--font-ui);
+      font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    }
+    .filter-btn.active, .filter-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 12px;
+      padding: 12px 14px; background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); transition: all 0.2s; animation: slideIn 0.3s ease; position: relative;
+    }
+    .history-item:hover { border-color: var(--border-strong); background: var(--bg-card); }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    .history-date { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--fg); }
+    .history-day { font-size: 11px; color: var(--fg-dim); margin-top: 2px; }
+    .history-times { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); flex-wrap: wrap; }
+    .history-times .arrow { color: var(--fg-dim); }
+    .history-times .descuento { font-size: 10px; color: var(--warning); background: var(--warning-glow); padding: 1px 6px; border-radius: 8px; font-weight: 600; }
+    .history-totals { text-align: right; }
+    .history-net-hours { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--fg); }
+    .history-extra-hours { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 3px; }
+    .history-extra-hours.has-extra { background: var(--warning-glow); color: var(--warning); }
+    .history-extra-hours.no-extra { background: var(--accent-soft); color: var(--accent); }
+    .history-extra-hours.negative { background: var(--danger-glow); color: var(--danger); }
+    .history-delete {
+      position: absolute; top: 6px; right: 6px; width: 22px; height: 22px;
+      border: none; background: transparent; color: var(--fg-dim); cursor: pointer;
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: all 0.2s;
+    }
+    .history-item:hover .history-delete { opacity: 1; }
+    .history-delete:hover { background: var(--danger-glow); color: var(--danger); }
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--fg-dim); }
+    .empty-state p { font-size: 14px; margin-top: 8px; }
+
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .summary-table th {
+      text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--fg-dim); border-bottom: 1px solid var(--border); font-weight: 600;
+    }
+    .summary-table td {
+      padding: 8px 10px; border-bottom: 1px solid rgba(16,185,129,0.05);
+      color: var(--fg-muted); font-family: var(--font-mono); font-weight: 500;
+    }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-table .total-row td { font-weight: 700; color: var(--fg); border-top: 2px solid var(--border-strong); border-bottom: none; }
+
+    .config-group { margin-bottom: 24px; }
+    .config-group-title { font-size: 14px; font-weight: 600; color: var(--fg); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .config-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px; }
+    .config-row + .config-row { border-top: 1px solid rgba(16,185,129,0.06); }
+    .config-label { font-size: 14px; color: var(--fg-muted); }
+    .config-label small { display: block; font-size: 12px; color: var(--fg-dim); margin-top: 2px; }
+    .config-input {
+      width: 100px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-xs);
+      background: var(--bg-elevated); color: var(--fg); font-family: var(--font-mono);
+      font-size: 14px; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s;
+    }
+    .config-input:focus { border-color: var(--accent); }
+    .config-select {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-xs);
+      background: var(--bg-elevated); color: var(--fg); font-family: var(--font-ui);
+      font-size: 13px; outline: none; cursor: pointer;
+    }
+    .config-select:focus { border-color: var(--accent); }
+    .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px);
+      z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.show { display: flex; animation: fadeIn 0.2s ease; }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: var(--radius);
+      padding: 28px; max-width: 440px; width: 100%; box-shadow: var(--shadow-lg);
+      animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .modal-subtitle { font-size: 14px; color: var(--fg-muted); margin-bottom: 20px; line-height: 1.5; }
+    .modal-field { margin-bottom: 16px; }
+    .modal-field label { display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 6px; font-weight: 500; }
+    .modal-field input, .modal-field select {
+      width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-xs);
+      background: var(--bg-elevated); color: var(--fg); font-family: var(--font-mono);
+      font-size: 16px; outline: none; transition: border-color 0.2s;
+    }
+    .modal-field input:focus, .modal-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .modal-highlight {
+      padding: 14px; background: var(--accent-soft); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); margin-bottom: 20px; text-align: center;
+    }
+    .modal-highlight .big-num { font-family: var(--font-mono); font-size: 36px; font-weight: 700; color: var(--accent); }
+    .modal-highlight .big-label { font-size: 12px; color: var(--fg-muted); margin-top: 4px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .modal-actions .btn { flex: 1; justify-content: center; }
+
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      padding: 12px 20px; border-radius: var(--radius-sm); background: var(--bg-card);
+      border: 1px solid var(--border-strong); color: var(--fg); font-size: 14px; font-weight: 500;
+      box-shadow: var(--shadow-lg); animation: toastIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex; align-items: center; gap: 10px; max-width: 340px;
+    }
+    .toast.success { border-color: var(--accent); }
+    .toast.success::before { content: '✓'; color: var(--accent); font-weight: 700; }
+    .toast.error { border-color: var(--danger); }
+    .toast.error::before { content: '!'; color: var(--danger); font-weight: 700; }
+    .toast.removing { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(40px) scale(0.9); } to { opacity: 1; transform: translateX(0) scale(1); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateX(40px) scale(0.9); } }
+
+    #particles-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(6, 11, 9, 0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border); display: none; padding: 8px 0;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    @media (max-width: 640px) {
+      .bottom-nav { display: flex; }
+      .nav-tabs { display: none; }
+      body { padding-bottom: 90px; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+    .bottom-nav-inner { display: flex; max-width: 800px; margin: 0 auto; }
+    .bottom-nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 6px; border: none; background: transparent; color: var(--fg-dim);
+      cursor: pointer; transition: color 0.2s; font-family: var(--font-ui);
+    }
+    .bottom-nav-btn.active { color: var(--accent); }
+    .bottom-nav-btn span { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    @media (max-width: 480px) {
+      .stats-grid { gap: 8px; }
+      .stat-value { font-size: 22px; }
+      .history-item { grid-template-columns: 60px 1fr auto; gap: 8px; padding: 10px 12px; }
+      main { padding: 14px; }
+      .preview-value { font-size: 18px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    .loading-spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--fg-dim); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <header class="app-header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">H</div>
+        <div class="logo-text">Horo<span>metro</span></div>
+      </div>
+      <div class="header-right">
+        <div class="sync-badge online" id="syncBadge">
+          <div class="sync-dot"></div>
+          <span id="syncText">Online</span>
+        </div>
+        <div class="month-badge" id="monthBadge">—</div>
+        <button class="btn-icon" id="btnInstall" title="Instalar app" style="display:none;">
+          <i data-lucide="download" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-view="clock" role="tab" aria-selected="true">
+        <i data-lucide="clock" style="width:14px;height:14px;"></i> Registro
+      </button>
+      <button class="nav-tab" data-view="history" role="tab" aria-selected="false">
+        <i data-lucide="calendar-days" style="width:14px;height:14px;"></i> Historial
+      </button>
+      <button class="nav-tab" data-view="summary" role="tab" aria-selected="false">
+        <i data-lucide="bar-chart-3" style="width:14px;height:14px;"></i> Resumen
+      </button>
+      <button class="nav-tab" data-view="settings" role="tab" aria-selected="false">
+        <i data-lucide="settings" style="width:14px;height:14px;"></i> Ajustes
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- REGISTRO -->
+    <section class="view active" id="viewClock">
+      <div class="card clock-section">
+        <div class="live-clock" id="liveClock">00:00:00</div>
+        <div class="live-date" id="liveDate"></div>
+      </div>
+      <div class="form-card">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="regDate">Fecha</label>
+            <input type="date" id="regDate">
+          </div>
+          <div class="form-field">
+            <label for="regStart">Entrada</label>
+            <input type="time" id="regStart">
+          </div>
+          <div class="form-field">
+            <label for="regEnd">Salida</label>
+            <input type="time" id="regEnd">
+          </div>
+        </div>
+        <div class="descuento-info">
+          <i data-lucide="utensils" style="width:16px;height:16px;flex-shrink:0;"></i>
+          Descuento automático: <strong id="descuentoLabel">1h comida + 30min almuerzo = 1h 30min</strong>
+        </div>
+        <div class="preview-calc" id="previewCalc">
+          <div class="preview-item">
+            <div class="preview-value white" id="prevBruto">—:—</div>
+            <div class="preview-label">Bruto</div>
+          </div>
+          <div class="preview-item">
+            <div class="preview-value amber" id="prevDesc">-1:30</div>
+            <div class="preview-label">Descuento</div>
+          </div>
+          <div class="preview-item">
+            <div class="preview-value green" id="prevNeto">—:—</div>
+            <div class="preview-label">Neto</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btnSaveRecord">
+          <i data-lucide="plus-circle" style="width:18px;height:18px;"></i> Guardar registro
+        </button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value green" id="statTodayNet">0:00</div>
+          <div class="stat-label">Neto hoy</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value amber" id="statTodayExtra">0:00</div>
+          <div class="stat-label">Extras hoy</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value white" id="statWeekNet">0:00</div>
+          <div class="stat-label">Neto semana</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value amber" id="statWeekExtra">0:00</div>
+          <div class="stat-label">Extras semana</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section class="view" id="viewHistory">
+      <div class="card">
+        <div class="history-header">
+          <div class="card-title" style="margin-bottom:0;">Registros</div>
+          <div class="history-filters">
+            <button class="filter-btn active" data-filter="all">Todos</button>
+            <button class="filter-btn" data-filter="week">Semana</button>
+            <button class="filter-btn" data-filter="month">Mes</button>
+          </div>
+        </div>
+        <div class="history-list" id="historyList">
+          <div class="empty-state">
+            <i data-lucide="inbox" style="width:40px;height:40px;color:var(--fg-dim);"></i>
+            <p>Sin registros aún.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESUMEN -->
+    <section class="view" id="viewSummary">
+      <div class="card">
+        <div class="card-title">Horas netas por día — Última semana</div>
+        <div class="chart-container" id="weekChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Resumen mensual</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+          <button class="btn-icon" id="prevMonth"><i data-lucide="chevron-left" style="width:16px;height:16px;"></i></button>
+          <span style="font-weight:600;font-size:15px;" id="summaryMonthLabel">—</span>
+          <button class="btn-icon" id="nextMonth"><i data-lucide="chevron-right" style="width:16px;height:16px;"></i></button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="summary-table">
+            <thead>
+              <tr><th>Día</th><th>Entrada</th><th>Salida</th><th>Bruto</th><th>Desc.</th><th>Neto</th><th>Extra</th></tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+          <div class="stat-card" style="flex:1;min-width:100px;">
+            <div class="stat-value green" id="sumNet">0:00</div>
+            <div class="stat-label">Horas netas</div>
+          </div>
+          <div class="stat-card" style="flex:1;min-width:100px;">
+            <div class="stat-value amber" id="sumExtra">0:00</div>
+            <div class="stat-label">Horas extras</div>
+          </div>
+          <div class="stat-card" style="flex:1;min-width:100px;">
+            <div class="stat-value white" id="sumDias">0</div>
+            <div class="stat-label">Días trabajados</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Estimación económica</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value green" id="sumEarnings">0.00</div>
+            <div class="stat-label">Ganancia normal</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value amber" id="sumExtraEarnings">0.00</div>
+            <div class="stat-label">Ganancia extra</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="view" id="viewSettings">
+      <div class="card">
+        <div class="config-group">
+          <div class="config-group-title">Horario mensual</div>
+          <div class="config-row">
+            <div class="config-label">Horas diarias este mes<small id="cfgMonthLabel">Jornada normal del mes actual</small></div>
+            <select class="config-select" id="cfgDailyHours">
+              <option value="7">7 horas</option>
+              <option value="7.5">7,5 horas</option>
+              <option value="8" selected>8 horas</option>
+              <option value="8.5">8,5 horas</option>
+              <option value="9">9 horas</option>
+            </select>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" id="btnChangeMonthHours">
+              <i data-lucide="calendar-check" style="width:16px;height:16px;"></i> Cambiar horario de este mes
+            </button>
+          </div>
+        </div>
+        <div class="config-group">
+          <div class="config-group-title">Descuentos por día</div>
+          <div class="config-row">
+            <div class="config-label">Tiempo de comida (minutos)<small>Se descuenta de cada jornada</small></div>
+            <input type="number" class="config-input" id="cfgFoodMin" min="0" max="180" step="5" value="60">
+          </div>
+          <div class="config-row">
+            <div class="config-label">Tiempo de almuerzo (minutos)<small>Se descuenta de cada jornada</small></div>
+            <input type="number" class="config-input" id="cfgLunchMin" min="0" max="120" step="5" value="30">
+          </div>
+        </div>
+        <div class="config-group">
+          <div class="config-group-title">Jornada</div>
+          <div class="config-row">
+            <div class="config-label">Días laborables/semana<small>Para calcular base semanal</small></div>
+            <select class="config-select" id="cfgWorkDays">
+              <option value="5" selected>Lun — Vie (5)</option>
+              <option value="6">Lun — Sáb (6)</option>
+            </select>
+          </div>
+        </div>
+        <div class="config-group">
+          <div class="config-group-title">Tarifas</div>
+          <div class="config-row">
+            <div class="config-label">Pago por hora normal</div>
+            <input type="number" class="config-input" id="cfgHourRate" min="0" step="0.01" value="10">
+          </div>
+          <div class="config-row">
+            <div class="config-label">Multiplicador hora extra<small>1.5 = 150% del valor normal</small></div>
+            <input type="number" class="config-input" id="cfgExtraMult" min="1" max="5" step="0.1" value="1.5">
+          </div>
+          <div class="config-row">
+            <div class="config-label">Símbolo de moneda</div>
+            <input type="text" class="config-input" id="cfgCurrency" value="$" style="width:60px;" maxlength="3">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btnSaveConfig">
+          <i data-lucide="save" style="width:16px;height:16px;"></i> Guardar configuración
+        </button>
+      </div>
+      <div class="card">
+        <div class="config-group">
+          <div class="config-group-title">Datos</div>
+          <div class="action-buttons">
+            <button class="btn" id="btnImport"><i data-lucide="upload" style="width:16px;height:16px;"></i> Importar</button>
+            <button class="btn" id="btnExportJSON"><i data-lucide="download" style="width:16px;height:16px;"></i> Exportar JSON</button>
+            <button class="btn" id="btnExportCSV"><i data-lucide="file-text" style="width:16px;height:16px;"></i> Exportar CSV</button>
+          </div>
+        </div>
+        <button class="btn btn-danger btn-block" id="btnClearAll" style="margin-top:16px;">
+          <i data-lucide="trash-2" style="width:16px;height:16px;"></i> Borrar todos los datos
+        </button>
+      </div>
+      <div class="card" style="text-align:center;color:var(--fg-dim);font-size:13px;">
+        <p>Horometro v2.0 — Datos guardados en Vercel KV</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL MES -->
+  <div class="modal-overlay" id="monthModal">
+    <div class="modal">
+      <div class="modal-title" id="monthModalTitle">Configurar mes</div>
+      <div class="modal-subtitle" id="monthModalSub">Establece las horas diarias para este mes</div>
+      <div class="modal-highlight">
+        <div class="big-num" id="monthModalBig">8h</div>
+        <div class="big-label">Horas diarias</div>
+      </div>
+      <div class="modal-field">
+        <label for="monthModalSelect">Horas diarias del mes</label>
+        <select id="monthModalSelect">
+          <option value="7">7 horas</option>
+          <option value="7.5">7,5 horas</option>
+          <option value="8" selected>8 horas</option>
+          <option value="8.5">8,5 horas</option>
+          <option value="9">9 horas</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="monthModalSkip">Omitir</button>
+        <button class="btn btn-primary" id="monthModalSave">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <div class="modal-title" id="confirmTitle">Confirmar</div>
+      <p style="color:var(--fg-muted);font-size:14px;margin-bottom:8px;" id="confirmMsg"></p>
+      <div class="modal-actions">
+        <button class="btn" id="confirmCancel">Cancelar</button>
+        <button class="btn btn-danger" id="confirmOk">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importInput" accept=".json" style="display:none;">
+
+  <nav class="bottom-nav" role="tablist">
+    <div class="bottom-nav-inner">
+      <button class="bottom-nav-btn active" data-view="clock" role="tab"><i data-lucide="clock" style="width:20px;height:20px;"></i><span>Registro</span></button>
+      <button class="bottom-nav-btn" data-view="history" role="tab"><i data-lucide="calendar-days" style="width:20px;height:20px;"></i><span>Historial</span></button>
+      <button class="bottom-nav-btn" data-view="summary" role="tab"><i data-lucide="bar-chart-3" style="width:20px;height:20px;"></i><span>Resumen</span></button>
+      <button class="bottom-nav-btn" data-view="settings" role="tab"><i data-lucide="settings" style="width:20px;height:20px;"></i><span>Ajustes</span></button>
+    </div>
+  </nav>
+
+  <script>
+    // ========================================================
+    // HOROMETRO v2.0 — DATOS EN VERCEL KV
+    // ========================================================
+
+    const API_URL = '/api/horas';
+    const LOCAL_KEYS = { records: 'hm_records', config: 'hm_config', months: 'hm_months' };
+
+    // Estado local (caché)
+    let appData = { records: [] };
+    let config = { foodMin: 60, lunchMin: 30, workDays: 5, hourRate: 10, extraMult: 1.5, currency: '$' };
+    let monthHours = {};
+    let isOnline = true;
+
+    // ========== CAPA DE DATOS (API + fallback localStorage) ==========
+    async function api(action, payload = {}) {
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, payload })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setSyncStatus('online');
+        return await res.json();
+      } catch (e) {
+        setSyncStatus('offline');
+        throw e;
+      }
+    }
+
+    // Indicador de conexión
+    function setSyncStatus(status) {
+      const badge = document.getElementById('syncBadge');
+      const text = document.getElementById('syncText');
+      badge.className = 'sync-badge ' + status;
+      if (status === 'online') text.textContent = 'Cloud';
+      else if (status === 'offline') text.textContent = 'Local';
+      else if (status === 'syncing') text.textContent = '...';
+    }
+
+    // Cargar todo desde la API
+    async function loadAll() {
+      setSyncStatus('syncing');
+      try {
+        const [recRes, cfgRes, moRes] = await Promise.all([
+          api('getRecords'),
+          api('getConfig'),
+          api('getMonths')
+        ]);
+        appData.records = recRes.records || [];
+        config = cfgRes.config || config;
+        monthHours = moRes.months || {};
+        setSyncStatus('online');
+      } catch {
+        // Fallback a localStorage
+        appData.records = JSON.parse(localStorage.getItem(LOCAL_KEYS.records) || '[]');
+        config = JSON.parse(localStorage.getItem(LOCAL_KEYS.config) || 'null') || config;
+        monthHours = JSON.parse(localStorage.getItem(LOCAL_KEYS.months) || '{}');
+        setSyncStatus('offline');
+      }
+    }
+
+    // Guardar registros
+    async function saveRecords(records) {
+      appData.records = records;
+      try {
+        await api('saveRecord', { record: null }); // No, usamos set directo
+        // Mejor: hacer un set directamente de todo el array
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setRecords', payload: { records } })
+        });
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      localStorage.setItem(LOCAL_KEYS.records, JSON.stringify(records));
+    }
+
+    async function saveRecordDirect(record) {
+      try {
+        const res = await api('saveRecord', { record });
+        if (res.records) appData.records = res.records;
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      // Sincronizar localStorage como backup
+      const idx = appData.records.findIndex(r => r.date === record.date);
+      if (idx >= 0) appData.records[idx] = record;
+      else appData.records.push(record);
+      localStorage.setItem(LOCAL_KEYS.records, JSON.stringify(appData.records));
+    }
+
+    async function deleteRecordDirect(id) {
+      try {
+        const res = await api('deleteRecord', { id });
+        if (res.records) appData.records = res.records;
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      appData.records = appData.records.filter(r => r.id !== id);
+      localStorage.setItem(LOCAL_KEYS.records, JSON.stringify(appData.records));
+    }
+
+    async function saveConfigDirect() {
+      try {
+        await api('saveConfig', { config });
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      localStorage.setItem(LOCAL_KEYS.config, JSON.stringify(config));
+    }
+
+    async function saveMonthsDirect() {
+      try {
+        await api('saveMonths', { months: monthHours });
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      localStorage.setItem(LOCAL_KEYS.months, JSON.stringify(monthHours));
+    }
+
+    async function clearAllDirect() {
+      try {
+        await api('clearAll');
+        setSyncStatus('online');
+      } catch {
+        setSyncStatus('offline');
+      }
+      appData.records = [];
+      monthHours = {};
+      Object.values(LOCAL_KEYS).forEach(k => localStorage.removeItem(k));
+    }
+
+    // ========== UTILIDADES ==========
+    function todayStr() { return new Date().toISOString().split('T')[0]; }
+    function nowTimeStr() { const n = new Date(); return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); }
+    function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+    function minToStr(m) { m = Math.round(m); if (m < 0) return '-' + minToStr(-m); const h = Math.floor(m / 60); return h + ':' + String(m % 60).padStart(2, '0'); }
+    function getMonthKey(ds) { return ds.slice(0, 7); }
+    function getMonthKeyNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+    function getMonthDailyHours(mk) { return monthHours[mk] || 8; }
+    function calcRecord(start, end) {
+      const bruto = timeToMin(end) - timeToMin(start);
+      const descuento = config.foodMin + config.lunchMin;
+      const neto = Math.max(0, bruto - descuento);
+      return { bruto, descuento, neto };
+    }
+    function calcExtra(netoMin, monthKey) {
+      const baseMin = getMonthDailyHours(monthKey) * 60;
+      if (netoMin <= baseMin) return { normal: netoMin, extra: 0 };
+      return { normal: baseMin, extra: netoMin - baseMin };
+    }
+
+    const DAY_NAMES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const DAY_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    function shortDay(ds) { return DAY_SHORT[new Date(ds+'T12:00:00').getDay()]; }
+    function formatDate(ds) { const d = new Date(ds+'T12:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+    function getMonday(d) { const date = new Date(d); const day = date.getDay(); date.setDate(date.getDate() - day + (day === 0 ? -6 : 1)); date.setHours(0,0,0,0); return date; }
+    function sameMonth(ds, y, m) { const d = new Date(ds+'T12:00:00'); return d.getFullYear()===y && d.getMonth()===m; }
+
+    // ========== TOAST ==========
+    function showToast(msg, type='success') {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`; t.textContent = msg; c.appendChild(t);
+      setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    // ========== RELOJ ==========
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('liveClock').textContent =
+        String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+      const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+      const ds = now.toLocaleDateString('es-ES', opts);
+      document.getElementById('liveDate').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    // ========== BADGE MES ==========
+    function updateMonthBadge() {
+      const mk = getMonthKeyNow();
+      const hrs = getMonthDailyHours(mk);
+      const d = new Date();
+      document.getElementById('monthBadge').textContent = `${MONTH_NAMES[d.getMonth()].slice(0,3)}: ${hrs}h`;
+    }
+
+    // ========== DESCUENTO LABEL ==========
+    function updateDescuentoLabel() {
+      document.getElementById('descuentoLabel').textContent =
+        `${minToStr(config.foodMin)} comida + ${minToStr(config.lunchMin)} almuerzo = ${minToStr(config.foodMin + config.lunchMin)}`;
+    }
+
+    // ========== FORMULARIO ==========
+    const regDate = document.getElementById('regDate');
+    const regStart = document.getElementById('regStart');
+    const regEnd = document.getElementById('regEnd');
+    regDate.value = todayStr(); regStart.value = '08:00'; regEnd.value = '17:30';
+
+    function updatePreview() {
+      const start = regStart.value, end = regEnd.value;
+      const desc = config.foodMin + config.lunchMin;
+      document.getElementById('prevDesc').textContent = '-' + minToStr(desc);
+      if (!start || !end || timeToMin(end) <= timeToMin(start)) {
+        document.getElementById('prevBruto').textContent = '—:—';
+        document.getElementById('prevNeto').textContent = '—:—';
+        document.getElementById('prevNeto').className = 'preview-value green';
+        return;
+      }
+      const { bruto, neto } = calcRecord(start, end);
+      document.getElementById('prevBruto').textContent = minToStr(bruto);
+      document.getElementById('prevNeto').textContent = minToStr(neto);
+      const mk = getMonthKey(regDate.value || todayStr());
+      document.getElementById('prevNeto').className = 'preview-value ' + (neto > getMonthDailyHours(mk) * 60 ? 'amber' : 'green');
+    }
+    regStart.addEventListener('input', updatePreview);
+    regEnd.addEventListener('input', updatePreview);
+    regDate.addEventListener('input', updatePreview);
+
+    document.getElementById('btnSaveRecord').addEventListener('click', async () => {
+      const date = regDate.value, start = regStart.value, end = regEnd.value;
+      if (!date || !start || !end) { showToast('Completa todos los campos', 'error'); return; }
+      if (timeToMin(end) <= timeToMin(start)) { showToast('La salida debe ser posterior a la entrada', 'error'); return; }
+
+      const btn = document.getElementById('btnSaveRecord');
+      btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span> Guardando...';
+
+      try {
+        const existing = appData.records.find(r => r.date === date);
+        if (existing) {
+          await new Promise((resolve) => {
+            showConfirm('Registro existente', `Ya hay un registro para el ${formatDate(date)}. ¿Reemplazarlo?`, async () => {
+              await saveRecordDirect({ id: existing.id, date, start, end });
+              refreshAll();
+              showToast('Registro actualizado');
+              resolve();
+            });
+          });
+        } else {
+          await saveRecordDirect({ date, start, end });
+          refreshAll();
+          showToast(`Guardado: ${minToStr(calcRecord(start, end).neto)}h netas`);
+        }
+      } catch(e) {
+        showToast('Error al guardar', 'error');
+      }
+      btn.disabled = false; btn.innerHTML = '<i data-lucide="plus-circle" style="width:18px;height:18px;"></i> Guardar registro';
+      lucide.createIcons();
+    });
+
+    function refreshAll() { updateStats(); renderHistory(); renderWeekChart(); renderMonthlySummary(); updateMonthBadge(); updateDescuentoLabel(); }
+
+    // ========== ESTADÍSTICAS ==========
+    function updateStats() {
+      const today = todayStr(), monday = getMonday(new Date()), mk = getMonthKey(today);
+      let todayNet = 0;
+      appData.records.filter(r => r.date === today).forEach(r => { todayNet += calcRecord(r.start, r.end).neto; });
+      const todayExt = calcExtra(todayNet, mk);
+      document.getElementById('statTodayNet').textContent = minToStr(todayNet);
+      document.getElementById('statTodayExtra').textContent = minToStr(todayExt.extra);
+
+      let weekNet = 0;
+      appData.records.forEach(r => {
+        const rd = new Date(r.date+'T12:00:00'); rd.setHours(0,0,0,0);
+        if (rd >= monday) weekNet += calcRecord(r.start, r.end).neto;
+      });
+      const weekBase = getMonthDailyHours(mk) * 60 * config.workDays;
+      document.getElementById('statWeekNet').textContent = minToStr(weekNet);
+      document.getElementById('statWeekExtra').textContent = minToStr(Math.max(0, weekNet - weekBase));
+    }
+
+    // ========== HISTORIAL ==========
+    let currentFilter = 'all';
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      let records = [...appData.records].reverse();
+      if (currentFilter === 'week') {
+        const monday = getMonday(new Date());
+        records = records.filter(r => { const rd = new Date(r.date+'T12:00:00'); rd.setHours(0,0,0,0); return rd >= monday; });
+      } else if (currentFilter === 'month') {
+        const now = new Date();
+        records = records.filter(r => sameMonth(r.date, now.getFullYear(), now.getMonth()));
+      }
+      if (!records.length) {
+        list.innerHTML = `<div class="empty-state"><i data-lucide="inbox" style="width:40px;height:40px;color:var(--fg-dim);"></i><p>${currentFilter==='all'?'Sin registros aún.':'Sin registros en este periodo.'}</p></div>`;
+        lucide.createIcons(); return;
+      }
+      const desc = config.foodMin + config.lunchMin;
+      list.innerHTML = records.map(r => {
+        const { bruto, neto } = calcRecord(r.start, r.end);
+        const mk = getMonthKey(r.date);
+        const { extra } = calcExtra(neto, mk);
+        const baseMin = getMonthDailyHours(mk) * 60;
+        let ec = 'no-extra', et = 'completo';
+        if (extra > 0) { ec = 'has-extra'; et = '+' + minToStr(extra) + ' ext'; }
+        else if (neto < baseMin) { ec = 'negative'; et = '-' + minToStr(baseMin - neto); }
+        return `<div class="history-item"><div><div class="history-date">${formatDate(r.date)}</div><div class="history-day">${shortDay(r.date)}</div></div><div class="history-times">${r.start} <span class="arrow">→</span> ${r.end} <span class="descuento">-${minToStr(desc)}</span></div><div class="history-totals"><div class="history-net-hours">${minToStr(neto)}h</div><div class="history-extra-hours ${ec}">${et}</div></div><button class="history-delete" onclick="handleDelete('${r.id}')" title="Eliminar"><i data-lucide="x" style="width:14px;height:14px;"></i></button></div>`;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    async function handleDelete(id) {
+      await deleteRecordDirect(id);
+      refreshAll();
+      showToast('Registro eliminado');
+    }
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); currentFilter = btn.dataset.filter; renderHistory();
+      });
+    });
+
+    // ========== GRÁFICO SEMANAL ==========
+    function renderWeekChart() {
+      const container = document.getElementById('weekChart');
+      const monday = getMonday(new Date());
+      const days = [];
+      for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(d.getDate() + i); days.push({ date: d.toISOString().split('T')[0], dayName: DAY_SHORT[d.getDay()], neto: 0 }); }
+      appData.records.forEach(r => { const day = days.find(d => d.date === r.date); if (day) day.neto += calcRecord(r.start, r.end).neto; });
+      const mk = getMonthKey(todayStr());
+      const baseH = getMonthDailyHours(mk);
+      const maxMin = Math.max(baseH * 60 * 1.5, ...days.map(d => d.neto));
+      container.innerHTML = days.map(d => {
+        const isExtra = d.neto > baseH * 60;
+        const hPct = maxMin > 0 ? (d.neto / maxMin) * 100 : 0;
+        const isToday = d.date === todayStr();
+        return `<div class="chart-bar-wrap"><div class="chart-bar-value">${d.neto ? minToStr(d.neto) : ''}</div><div class="chart-bar ${isExtra ? 'extra' : ''} ${!d.neto ? 'empty' : ''}" style="height:${Math.max(2, hPct)}%;${isToday ? 'box-shadow:0 0 12px var(--accent-glow);' : ''}"></div><div class="chart-bar-label" style="${isToday ? 'color:var(--accent);font-weight:700;' : ''}">${d.dayName}</div></div>`;
+      }).join('');
+    }
+
+    // ========== RESUMEN MENSUAL ==========
+    let sumYear, sumMonth;
+    function initSumMonth() { const n = new Date(); sumYear = n.getFullYear(); sumMonth = n.getMonth(); }
+    initSumMonth();
+
+    function renderMonthlySummary() {
+      const mk = `${sumYear}-${String(sumMonth + 1).padStart(2, '0')}`;
+      document.getElementById('summaryMonthLabel').textContent = `${MONTH_NAMES[sumMonth]} ${sumYear}`;
+      const body = document.getElementById('summaryBody');
+      const recs = appData.records.filter(r => sameMonth(r.date, sumYear, sumMonth)).sort((a, b) => a.date.localeCompare(b.date));
+      const desc = config.foodMin + config.lunchMin;
+      let totalNet = 0, totalExtra = 0;
+
+      if (!recs.length) {
+        body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--fg-dim);padding:24px;">Sin registros este mes</td></tr>`;
+      } else {
+        body.innerHTML = recs.map(r => {
+          const { bruto, neto } = calcRecord(r.start, r.end);
+          const { extra } = calcExtra(neto, mk);
+          totalNet += neto; totalExtra += extra;
+          return `<tr><td>${formatDate(r.date)} <span style="color:var(--fg-dim);font-size:10px;">${shortDay(r.date)}</span></td><td>${r.start}</td><td>${r.end}</td><td>${minToStr(bruto)}</td><td style="color:var(--warning);">-${minToStr(desc)}</td><td style="color:var(--accent);">${minToStr(neto)}</td><td style="color:${extra > 0 ? 'var(--warning)' : 'var(--fg-dim)'};">${extra > 0 ? '+' + minToStr(extra) : '—'}</td></tr>`;
+        }).join('');
+        body.innerHTML += `<tr class="total-row"><td colspan="5">TOTAL</td><td style="color:var(--accent);">${minToStr(totalNet)}</td><td style="color:var(--warning);">${totalExtra > 0 ? '+' + minToStr(totalExtra) : '—'}</td></tr>`;
+      }
+
+      const { normal } = calcExtra(totalNet, mk);
+      const cur = config.currency;
+      document.getElementById('sumNet').textContent = minToStr(totalNet);
+      document.getElementById('sumExtra').textContent = minToStr(totalExtra);
+      document.getElementById('sumDias').textContent = recs.length;
+      document.getElementById('sumEarnings').textContent = `${cur}${((normal / 60) * config.hourRate).toFixed(2)}`;
+      document.getElementById('sumExtraEarnings').textContent = `${cur}${((totalExtra / 60) * config.hourRate * config.extraMult).toFixed(2)}`;
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', () => { sumMonth--; if (sumMonth < 0) { sumMonth = 11; sumYear--; } renderMonthlySummary(); });
+    document.getElementById('nextMonth').addEventListener('click', () => { sumMonth++; if (sumMonth > 11) { sumMonth = 0; sumYear++; } renderMonthlySummary(); });
+
+    // ========== NAVEGACIÓN ==========
+    function switchView(v) {
+      document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+      document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1)).classList.add('active');
+      document.querySelectorAll('.nav-tab').forEach(t => { t.classList.toggle('active', t.dataset.view === v); t.setAttribute('aria-selected', t.dataset.view === v); });
+      document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+      if (v === 'history') renderHistory();
+      if (v === 'summary') { renderWeekChart(); renderMonthlySummary(); }
+      if (v === 'clock') updateStats();
+    }
+    document.querySelectorAll('.nav-tab, .bottom-nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+    // ========== MODAL MES ==========
+    function showMonthModal() {
+      const mk = getMonthKeyNow();
+      const d = new Date();
+      const mName = MONTH_NAMES[d.getMonth()];
+      document.getElementById('monthModalTitle').textContent = `Configurar ${mName} ${d.getFullYear()}`;
+      document.getElementById('monthModalSub').textContent = `¿Cuántas horas diarias corresponden este mes?`;
+      document.getElementById('monthModalBig').textContent = getMonthDailyHours(mk) + 'h';
+      document.getElementById('monthModalSelect').value = String(getMonthDailyHours(mk));
+      document.getElementById('monthModal').classList.add('show');
+    }
+
+    document.getElementById('monthModalSelect').addEventListener('change', (e) => {
+      document.getElementById('monthModalBig').textContent = e.target.value + 'h';
+    });
+
+    document.getElementById('monthModalSave').addEventListener('click', async () => {
+      const mk = getMonthKeyNow();
+      monthHours[mk] = parseFloat(document.getElementById('monthModalSelect').value);
+      await saveMonthsDirect();
+      document.getElementById('monthModal').classList.remove('show');
+      refreshAll();
+      showToast(`Horario actualizado a ${monthHours[mk]}h/día`);
+    });
+
+    document.getElementById('monthModalSkip').addEventListener('click', () => {
+      document.getElementById('monthModal').classList.remove('show');
+    });
+
+    document.getElementById('monthModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('monthModal')) document.getElementById('monthModal').classList.remove('show');
+    });
+
+    document.getElementById('btnChangeMonthHours').addEventListener('click', showMonthModal);
+
+    // ========== CONFIGURACIÓN ==========
+    function loadConfigUI() {
+      document.getElementById('cfgDailyHours').value = String(getMonthDailyHours(getMonthKeyNow()));
+      document.getElementById('cfgFoodMin').value = config.foodMin;
+      document.getElementById('cfgLunchMin').value = config.lunchMin;
+      document.getElementById('cfgWorkDays').value = config.workDays;
+      document.getElementById('cfgHourRate').value = config.hourRate;
+      document.getElementById('cfgExtraMult').value = config.extraMult;
+      document.getElementById('cfgCurrency').value = config.currency;
+    }
+
+    document.getElementById('btnSaveConfig').addEventListener('click', async () => {
+      config.foodMin = parseInt(document.getElementById('cfgFoodMin').value) || 60;
+      config.lunchMin = parseInt(document.getElementById('cfgLunchMin').value) || 30;
+      config.workDays = parseInt(document.getElementById('cfgWorkDays').value) || 5;
+      config.hourRate = parseFloat(document.getElementById('cfgHourRate').value) || 10;
+      config.extraMult = parseFloat(document.getElementById('cfgExtraMult').value) || 1.5;
+      config.currency = document.getElementById('cfgCurrency').value || '$';
+
+      // También actualizar horas del mes si se cambió
+      const mk = getMonthKeyNow();
+      const newHours = parseFloat(document.getElementById('cfgDailyHours').value);
+      if (newHours && newHours !== getMonthDailyHours(mk)) {
+        monthHours[mk] = newHours;
+        await saveMonthsDirect();
+      }
+
+      await saveConfigDirect();
+      refreshAll();
+      showToast('Configuración guardada');
+    });
+
+    // ========== EXPORTAR / IMPORTAR ==========
+    document.getElementById('btnExportJSON').addEventListener('click', () => {
+      const data = { records: appData.records, config, months: monthHours, exportDate: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      downloadBlob(blob, `horometro_${todayStr()}.json`);
+      showToast('Exportado en JSON');
+    });
+
+    document.getElementById('btnExportCSV').addEventListener('click', () => {
+      const cur = config.currency;
+      let csv = 'Fecha,Dia,Entrada,Salida,Bruto,Descuento,Neto,Extra,Ganancia\n';
+      appData.records.forEach(r => {
+        const { bruto, neto } = calcRecord(r.start, r.end);
+        const mk = getMonthKey(r.date);
+        const { extra } = calcExtra(neto, mk);
+        const earn = (Math.min(neto, getMonthDailyHours(mk) * 60) / 60) * config.hourRate + (extra / 60) * config.hourRate * config.extraMult;
+        csv += `${r.date},${shortDay(r.date)},${r.start},${r.end},${minToStr(bruto)},-${minToStr(config.foodMin + config.lunchMin)},${minToStr(neto)},${extra > 0 ? '+' + minToStr(extra) : '0:00'},${cur}${earn.toFixed(2)}\n`;
+      });
+      downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `horometro_${todayStr()}.csv`);
+      showToast('Exportado en CSV');
+    });
+
+    function downloadBlob(blob, name) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+    }
+
+    document.getElementById('btnImport').addEventListener('click', () => document.getElementById('importInput').click());
+    document.getElementById('importInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (data.records) {
+          for (const r of data.records) await saveRecordDirect(r);
+          if (data.config) { config = data.config; await saveConfigDirect(); }
+          if (data.months) { monthHours = data.months; await saveMonthsDirect(); }
+          refreshAll(); loadConfigUI();
+          showToast(`Importados ${data.records.length} registros`);
+        } else { showToast('Archivo no válido', 'error'); }
+      } catch { showToast('Error al leer archivo', 'error'); }
+      e.target.value = '';
+    });
+
+    // ========== CONFIRM MODAL ==========
+    let confirmCb = null;
+    function showConfirm(title, msg, cb) {
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMsg').textContent = msg;
+      confirmCb = cb; document.getElementById('confirmModal').classList.add('show');
+    }
+    document.getElementById('confirmCancel').addEventListener('click', () => { document.getElementById('confirmModal').classList.remove('show'); confirmCb = null; });
+    document.getElementById('confirmModal').addEventListener('click', (e) => { if (e.target === document.getElementById('confirmModal')) { document.getElementById('confirmModal').classList.remove('show'); confirmCb = null; } });
+    document.getElementById('confirmOk').addEventListener('click', () => { document.getElementById('confirmModal').classList.remove('show'); if (confirmCb) confirmCb(); confirmCb = null; });
+
+    // BORRAR TODO
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      showConfirm('Borrar todo', 'Se eliminarán todos los registros y configuración.', async () => {
+        await clearAllDirect(); refreshAll(); loadConfigUI(); showToast('Datos eliminados');
+      });
+    });
+
+    // ========== PARTÍCULAS ==========
+    (function() {
+      const c = document.getElementById('particles-canvas'), ctx = c.getContext('2d');
+      let ps = [];
+      function resize() { c.width = innerWidth; c.height = innerHeight; }
+      resize(); addEventListener('resize', resize);
+      for (let i = 0; i < 35; i++) ps.push({ x: Math.random()*c.width, y: Math.random()*c.height, vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.3, r: Math.random()*2+0.5, a: Math.random()*0.25+0.05 });
+      function draw() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        ps.forEach(p => { p.x += p.vx; p.y += p.vy; if (p.x<0) p.x=c.width; if (p.x>c.width) p.x=0; if (p.y<0) p.y=c.height; if (p.y>c.height) p.y=0; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.1, p.r), 0, Math.PI*2); ctx.fillStyle=`rgba(16,185,129,${p.a})`; ctx.fill(); });
+        for (let i=0;i<ps.length;i++) for (let j=i+1;j<ps.length;j++) { const dx=ps[i].x-ps[j].x, dy=ps[i].y-ps[j].y, d=Math.sqrt(dx*dx+dy*dy); if (d<120) { ctx.beginPath(); ctx.moveTo(ps[i].x,ps[i].y); ctx.lineTo(ps[j].x,ps[j].y); ctx.strokeStyle=`rgba(16,185,129,${0.05*(1-d/120)})`; ctx.lineWidth=0.5; ctx.stroke(); } }
+        requestAnimationFrame(draw);
+      }
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) draw();
+    })();
+
+    // ========== PWA ==========
+    if ('serviceWorker' in navigator) {
+      const sw = `const C='horometro-v2';self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['/'])));self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))));self.clients.claim()});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(c=>{const f=fetch(e.request).then(r=>{if(r&&r.status===200){const cl=r.clone();caches.open(C).then(ca=>ca.put(e.request,cl))}return r}).catch(()=>c);return c||f}))});`;
+      navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], { type: 'application/javascript' }))).catch(() => {});
+    }
+
+    let deferredPrompt = null;
+    addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; document.getElementById('btnInstall').style.display = 'flex'; });
+    document.getElementById('btnInstall').addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('btnInstall').style.display = 'none'; });
+
+    const manifest = { name:'Horometro — Control de Horas', short_name:'Horometro', description:'Registro de horas trabajadas con descuento automático', start_url:'./', display:'standalone', background_color:'#060b09', theme_color:'#0a0f0d', orientation:'any', icons:[{src:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#10b981"/><text x="256" y="340" text-anchor="middle" font-family="sans-serif" font-size="260" font-weight="bold" fill="#060b09">H</text></svg>'),sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}] };
+    const ml = document.createElement('link'); ml.rel = 'manifest'; ml.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' })); document.head.appendChild(ml);
+
+    // ========== INICIO ==========
+    async function init() {
+      await loadAll();
+      loadConfigUI();
+      updatePreview();
+      refreshAll();
+
+      // Preguntar horario del mes si no está configurado
+      const mk = getMonthKeyNow();
+      if (!monthHours[mk]) {
+        setTimeout(() => showMonthModal(), 800);
+      }
+    }
+
+    init();
+    lucide.createIcons();
+  </script>
+</body>
+</html>
